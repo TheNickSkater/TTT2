@@ -541,6 +541,7 @@ include("ttt2/libraries/vskin.lua")
 include("ttt2/libraries/fileloader.lua")
 include("ttt2/libraries/door.lua")
 include("ttt2/libraries/thermalvision.lua")
+include("ttt2/libraries/migrations.lua")
 
 -- include ttt required files
 ttt_include("sh_util")
