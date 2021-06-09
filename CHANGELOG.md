@@ -4,10 +4,53 @@ All notable changes to TTT2 will be documented here. Inspired by [keep a changel
 
 ## Unreleased
 
+### Added
+
+- All new roundend menu
+  - new info panel that shows detailed role distribution during the round
+  - info panel also states detailed score events
+  - new timeline that displays the events that happened during the round
+  - added two new round end conditions: `time up` and `no one wins`
+- Added `ROLE_NONE` (ID `3` by default)
+  - Players now default to `ROLE_NONE` instead of `ROLE_INNOCENT`
+  - Enables the possibility to give Innocents access to a custom shop (`shopeditor`)
+- Karma now stores changes
+  - Is shown in roundend menu
+- Added the ConVar `ttt2_random_shop_items` for the number of items in the randomshop
+
 ### Fixed
 
+- Updated French translation (by @MisterClems)
 - Fixed IsOffScreen function being global for compatibility
 - Fixed a German translation string (by @FaRLeZz)
+- Fixed a Polish translation by adding new lines (by @Wuker)
+- Fixed a data initialization bug that appeared on the first (initial) spawn
+- Fixed silent Footsteps, while crouched bhopping
+- Fixed issue where base innocents could bypass the TTT2AvoidGeneralChat and TTT2AvoidTeamChat hooks with the team chat key
+- Fixed issue where roles with unknownTeam could see messages sent with the team chat key
+- Fixed the admin section label not being visible in the main menu
+- Fixed the auto resizing of the buttons based on the availability of a scrollbar not working
+
+### Changed
+
+- Microoptimization to improve code performance
+- Converted `roles` module into a library
+- Code cleanup and removed silly negations
+- Extended some ttt2net functions
+- Changed `bees` win to `nones` win
+- Changed the ConVar `ttt2_random_shops` to only disable the random shop (if set to `0`)
+- Shopeditor settings are now available in the F1 Menu
+- Moved the F1 menu generating system from a hook based system to a file based system
+  - removed the hooks `TTT2ModifyHelpMainMenu` and `TTT2ModifyHelpSubMenu`
+  - menus are now generated based on files located in `lua/terrortown/menus/gamemode/`
+  - submenus are generated from files located in folders with the menu name
+- Menus without content are now always hidden in the main menu
+
+### Breaking Changes
+
+- Adjusted `Player:HasRole()` and `Player:HasTeam()` to support simplified role and team checks (no parameter are supported anymore, use `Player:GetRole()` or `Player:GetTeam()` instead)
+- Moved global roleData to the `roles` library (e.g. `INNOCENT` to `roles.INNOCENT`). `INNOCENT`, `TRAITOR` etc. is not supported anymore. `ROLE_<ROLENAME>` is still supported and won't be changed.
+
 
 ## [v0.8.2b](https://github.com/TTT-2/TTT2/tree/v0.8.2b) (2021-03-25)
 

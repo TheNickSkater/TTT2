@@ -148,13 +148,9 @@ end
 function GetShopFallback(subrole, tbl)
 	local rd = roles.GetByIndex(subrole)
 	local shopFallback = GetGlobalString("ttt_" .. rd.abbr .. "_shop_fallback")
-	local fb = roles.GetStored(shopFallback)
 
-	if fb then
-		fb = fb.index
-	else
-		fb = ROLE_INNOCENT
-	end
+	local fb = roles.GetStored(shopFallback)
+	fb = fb and fb.index or ROLE_NONE
 
 	if not fb or shopFallback == SHOP_UNSET or shopFallback == SHOP_DISABLED then
 		return subrole, fb
@@ -197,7 +193,7 @@ function GetShopFallbackTable(subrole)
 
 	subrole, fallback = GetShopFallback(subrole)
 
-	if fallback == ROLE_INNOCENT then -- fallback is SHOP_UNSET
+	if fallback == ROLE_NONE then -- fallback is SHOP_UNSET
 		rd = roles.GetByIndex(subrole)
 
 		if rd.fallbackTable then
@@ -308,6 +304,10 @@ if SERVER then
 
 	---
 	-- @realm server
+	local random_shop_items = CreateConVar("ttt2_random_shop_items", "10", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_SERVER_CAN_EXECUTE}, "Set the number of shown items in a random shop.")
+
+	---
+	-- @realm server
 	local random_team_shops = CreateConVar("ttt2_random_team_shops", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_SERVER_CAN_EXECUTE}, "Set to 0 to disable")
 
 	---
@@ -333,7 +333,7 @@ if SERVER then
 			local tmp = {}
 
 			for i = 1, #tbl do
-				tmp[#tmp + 1] = tbl[i].id
+				tmp[i] = tbl[i].id
 			end
 
 			if #tmp <= 0 then continue end
@@ -555,23 +555,33 @@ if SERVER then
 	end
 
 	cvars.AddChangeCallback("ttt2_random_shops", function(name, old, new)
-		local tmp = tonumber(new)
+		local tmp = tobool(new)
+		local amount = GetGlobalInt("ttt2_random_shop_items")
 
-		SetGlobalInt("ttt2_random_shops", tmp)
+		SetGlobalBool("ttt2_random_shops", tmp)
 
-		if tmp > 0 then
-			UpdateRandomShops(nil, tmp, GetGlobalBool("ttt2_random_team_shops", true))
+		if tmp and amount > 0 then
+			UpdateRandomShops(nil, amount, GetGlobalBool("ttt2_random_team_shops", true))
 		end
 	end, "ttt2changeshops")
 
+	cvars.AddChangeCallback("ttt2_random_shop_items", function(name, old, new)
+		local tmp = tonumber(new)
+
+		SetGlobalInt("ttt2_random_shop_items", tmp)
+
+		if GetGlobalBool("ttt2_random_shops") and tmp > 0 then
+			UpdateRandomShops(nil, tmp, GetGlobalBool("ttt2_random_team_shops", true))
+		end
+	end, "ttt2changeshopitems")
+
 	cvars.AddChangeCallback("ttt2_random_team_shops", function(name, old, new)
 		local tmp = tobool(new)
-		local amount = GetGlobalInt("ttt2_random_shops")
 
 		SetGlobalBool("ttt2_random_team_shops", tmp)
 
-		if new ~= old and amount > 0 then
-			UpdateRandomShops(nil, amount, tmp)
+		if new ~= old and GetGlobalBool("ttt2_random_shops", true) then
+			UpdateRandomShops(nil, GetGlobalInt("ttt2_random_shop_items"), tmp)
 		end
 	end, "ttt2changeteamshops")
 
@@ -588,29 +598,28 @@ if SERVER then
 	end, "ttt2updatererollperbuyglobal")
 
 	hook.Add("TTTPrepareRound", "TTT2InitRandomShops", function()
-		local amount = GetGlobalInt("ttt2_random_shops")
-		if amount <= 0 then return end
+		if not GetGlobalBool("ttt2_random_shops") then return end
 
-		UpdateRandomShops(nil, amount, GetGlobalBool("ttt2_random_team_shops", true))
+		UpdateRandomShops(nil, GetGlobalInt("ttt2_random_shop_items"), GetGlobalBool("ttt2_random_team_shops", true))
 	end)
 
 	hook.Add("TTT2UpdateSubrole", "TTT2UpdateRandomShop", function(ply)
-		local amount = GetGlobalInt("ttt2_random_shops")
-		if amount <= 0 then return end
+		if not GetGlobalBool("ttt2_random_shops") then return end
 
-		UpdateRandomShops({ply}, amount, GetGlobalBool("ttt2_random_team_shops", true))
+		UpdateRandomShops({ply}, GetGlobalInt("ttt2_random_shop_items"), GetGlobalBool("ttt2_random_team_shops", true))
 	end)
 
 	hook.Add("PlayerInitialSpawn", "TTT2InitRandomShops", function(ply)
-		local amount = random_shops:GetInt()
+		local random_shop = random_shops:GetBool()
 
-		SetGlobalInt("ttt2_random_shops", amount)
+		SetGlobalBool("ttt2_random_shops", random_shop)
+		SetGlobalInt("ttt2_random_shop_items", random_shop_items:GetInt())
 		SetGlobalBool("ttt2_random_team_shops", random_team_shops:GetBool())
 		SetGlobalBool("ttt2_random_shop_reroll", random_shop_reroll:GetBool())
 		SetGlobalInt("ttt2_random_shop_reroll_cost", random_shop_reroll_cost:GetInt())
 		SetGlobalBool("ttt2_random_shop_reroll_per_buy", random_shop_reroll_per_buy:GetBool())
 
-		if amount <= 0 then return end
+		if not random_shop then return end
 
 		SyncRandomShops({ply})
 	end)
@@ -639,9 +648,8 @@ else -- CLIENT
 
 					for i = 1, #tmp do
 						local id = tmp[i]
-						local equip = not items.IsItem(id) and weapons.GetStored(id) or items.GetStored(id)
 
-						tmp2[#tmp2 + 1] = equip
+						tmp2[i] = not items.IsItem(id) and weapons.GetStored(id) or items.GetStored(id)
 					end
 
 					RANDOMSHOP[LocalPlayer()] = tmp2
@@ -665,7 +673,7 @@ end
 -- @internal
 -- @realm shared
 function GetModifiedEquipment(ply, fallback)
-	if ply and fallback and RANDOMSHOP[ply] and GetGlobalInt("ttt2_random_shops") > 0 then
+	if ply and fallback and RANDOMSHOP[ply] and GetGlobalBool("ttt2_random_shops") then
 		local tmp = {}
 
 		for i = 1, #RANDOMSHOP[ply] do
